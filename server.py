@@ -1,7 +1,10 @@
 from flask import Flask, request, redirect, render_template_string, jsonify
+import sqlite3
+import os
 
-# ... código anterior ...
+app = Flask(__name__)  # Definir la instancia de Flask
 
+# Ruta para manejar el escaneo del código QR
 @app.route('/scan/<offer_id>')
 def scan(offer_id):
     user_ip = request.remote_addr
@@ -49,3 +52,34 @@ def scan(offer_id):
     <p><strong>¡Oferta reclamada!</strong></p>
     <p>Quedan {{ remaining_scans }} ofertas disponibles.</p>
     ''', title=title, description=description, remaining_scans=remaining_scans)
+
+# Ejecutar la aplicación si se ejecuta este archivo directamente
+if __name__ == "__main__":
+    # Inicializar la base de datos si no existe
+    if not os.path.exists('offers.db'):
+        conn = sqlite3.connect('offers.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE offers (
+                offer_id TEXT PRIMARY KEY,
+                title TEXT,
+                description TEXT,
+                offer_type INTEGER,
+                max_scans INTEGER,
+                scans INTEGER DEFAULT 0
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE scans (
+                scan_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                offer_id TEXT,
+                user_ip TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(offer_id) REFERENCES offers(offer_id)
+            )
+        ''')
+        conn.commit()
+        conn.close()
+
+    # Ejecutar la aplicación Flask
+    app.run(host='0.0.0.0', port=5000)
