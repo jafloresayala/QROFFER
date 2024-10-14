@@ -1,13 +1,23 @@
-from flask import Flask, request, redirect, render_template_string, jsonify
+from flask import Flask, request, render_template_string, jsonify
 import sqlite3
 import os
 
-app = Flask(__name__)  # Definir la instancia de Flask
+# Crear la aplicación Flask
+app = Flask(__name__)
+
+# Página de inicio para evitar el error 404
+@app.route('/')
+def home():
+    return '''
+    <h1>Bienvenido a la App de Escaneo de Ofertas 🎉</h1>
+    <p>Escanea un código QR válido para reclamar tu oferta.</p>
+    <p>Ejemplo de ruta de escaneo: <a href="/scan/example-offer">/scan/example-offer</a></p>
+    '''
 
 # Ruta para manejar el escaneo del código QR
 @app.route('/scan/<offer_id>')
 def scan(offer_id):
-    user_ip = request.remote_addr
+    user_ip = request.remote_addr  # Obtener la IP del usuario
     conn = sqlite3.connect('offers.db')
     cursor = conn.cursor()
 
@@ -21,7 +31,7 @@ def scan(offer_id):
 
     title, description, offer_type, max_scans, scans = offer
 
-    # Verificar si el usuario ya ha reclamado la oferta
+    # Verificar si el usuario ya reclamó la oferta usando su IP
     cursor.execute('SELECT COUNT(*) FROM scans WHERE offer_id = ? AND user_ip = ?', (offer_id, user_ip))
     user_scans = cursor.fetchone()[0]
 
@@ -31,7 +41,7 @@ def scan(offer_id):
 
     if scans >= max_scans:
         conn.close()
-        return "Oferta Expirada"
+        return "Oferta Expirada."
 
     # Registrar el escaneo
     cursor.execute('INSERT INTO scans (offer_id, user_ip) VALUES (?, ?)', (offer_id, user_ip))
@@ -53,12 +63,13 @@ def scan(offer_id):
     <p>Quedan {{ remaining_scans }} ofertas disponibles.</p>
     ''', title=title, description=description, remaining_scans=remaining_scans)
 
-# Ejecutar la aplicación si se ejecuta este archivo directamente
+# Inicialización de la base de datos al iniciar el servidor
 if __name__ == "__main__":
-    # Inicializar la base de datos si no existe
     if not os.path.exists('offers.db'):
         conn = sqlite3.connect('offers.db')
         cursor = conn.cursor()
+
+        # Crear la tabla de ofertas si no existe
         cursor.execute('''
             CREATE TABLE offers (
                 offer_id TEXT PRIMARY KEY,
@@ -69,6 +80,8 @@ if __name__ == "__main__":
                 scans INTEGER DEFAULT 0
             )
         ''')
+
+        # Crear la tabla de escaneos si no existe
         cursor.execute('''
             CREATE TABLE scans (
                 scan_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,6 +91,7 @@ if __name__ == "__main__":
                 FOREIGN KEY(offer_id) REFERENCES offers(offer_id)
             )
         ''')
+
         conn.commit()
         conn.close()
 
